@@ -1,0 +1,62 @@
+##### Written on 2024/07/05 02:08:46 ###############################
+
+
+##### DESIGN INFO ##################################################
+
+Top Module:
+	top
+
+Constraint File(s):
+	F:/longxindaima/test3/test/source/test.fdc
+	
+
+##### SUMMARY ######################################################
+
+Found 0 error(s), 6 critical warning(s), 0 warning(s), out of 187 constraint(s)
+
+
+Inapplicable constraints(except overwritten constraints):
+********************************************
+
+
+
+
+
+
+Constraints with issues:
+********************************************
+
+
+
+define_attribute {p:sys_clk} {PAP_IO_LOC} {B5}
+	C: ConstraintEditor-2003: [F:/longxindaima/test3/test/source/test.fdc(line number: 45)] Attribute PAP_IO_LOC value is same with the old value on port p:sys_clk. Repeat command is found.
+
+define_attribute {p:sys_clk} {PAP_IO_VCCIO} {3.3}
+	C: ConstraintEditor-2003: [F:/longxindaima/test3/test/source/test.fdc(line number: 46)] Attribute PAP_IO_VCCIO value is same with the old value on port p:sys_clk. Repeat command is found.
+
+define_attribute {p:sys_clk} {PAP_IO_STANDARD} {LVTTL33}
+	C: ConstraintEditor-2003: [F:/longxindaima/test3/test/source/test.fdc(line number: 47)] Attribute PAP_IO_STANDARD value is same with the old value on port p:sys_clk. Repeat command is found.
+
+define_attribue {adc_clk} {PAP_IO_DIRECTION} {INPUT}
+	C: UserConstraintEditor-2001: [F:/longxindaima/test3/test/source/test.fdc(line number: 25)] IO Direction INPUT is incorrect, change it to OUTPUT.
+
+define_attribue {cs_n_i} {PAP_IO_LOC} {F14}
+	C: ConstraintEditor-2002: [F:/longxindaima/test3/test/source/test.fdc(line number: 107)] | Port cs_n_i has been placed at location F14, whose type is share pin.
+
+define_attribue {mosi_i} {PAP_IO_LOC} {G13}
+	C: ConstraintEditor-2002: [F:/longxindaima/test3/test/source/test.fdc(line number: 111)] | Port mosi_i has been placed at location G13, whose type is share pin.
+
+
+
+
+
+
+
+
+Constraints with matching wildcard expressions:
+********************************************
+
+
+
+
+

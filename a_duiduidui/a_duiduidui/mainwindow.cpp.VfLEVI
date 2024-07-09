@@ -1,0 +1,271 @@
+#include "mainwindow.h"
+#include "ui_mainwindow.h"
+int frequency=0;
+#define TIMER_TIMEOUT  100
+MainWindow::MainWindow(QWidget *parent)
+    : QMainWindow(parent)
+    , ui(new Ui::MainWindow)
+{
+
+    timer->start(TIMER_TIMEOUT);
+    if(!fpgainit())
+    {
+        QMessageBox::warning(this, "WARNING", "Unable to connect to FPGA");
+    }
+    ui->setupUi(this);
+    zuobiao();
+
+    connect(timer, SIGNAL(timeout()), this, SLOT(handleTimeout()));
+    connect(ui->dial,SIGNAL(sliderMoved(int)),this,SLOT(dialChanged(int)));
+    ui->dial->setValue(20);
+    ui->dial->setRange(0,40);
+    ui->dial->setNotchesVisible(true);
+    ui->dial->setSingleStep(1);//tri level
+
+    voltage = new QButtonGroup(this);
+    voltage->addButton(ui->radioButton_9,0);
+    voltage->addButton(ui->radioButton_10,1);
+    voltage->addButton(ui->radioButton_11,2);
+    voltage->addButton(ui->radioButton_12,3);
+
+    time = new QButtonGroup(this);
+    time->addButton(ui->radioButton,0);
+    time->addButton(ui->radioButton_4,1);
+    time->addButton(ui->radioButton_2,2);
+    ui->radioButton->setChecked(1);
+    ui->radioButton_9->setChecked(1);
+
+    connect(voltage, SIGNAL(buttonClicked(int)), this, SLOT(voltageClicked(int)));
+    connect(time, SIGNAL(buttonClicked(int)), this, SLOT(timeClicked(int)));
+
+    connect(ui->pushButton_4, SIGNAL(clicked()),this, SLOT(FFT_WAVE()));
+    float FFT_real[256]={0};
+    float FFT_image[256]={0};
+    float amp[256]={0};
+    float real_freq[256]={0};
+    QList<QPointF> oldData = series->points();
+    QList<QPointF> Data;
+    for(int i =0;i<oldData.size();i++)
+    {
+        FFT_real[i]=oldData.at(i).y();
+    }
+    FFT(FFT_real,FFT_image,256);
+    for (int i = 0; i < 256; i++)
+    {
+            amp[i] = 2*(sqrt(((FFT_real[i])*(FFT_real[i]) + (FFT_image[i])*(FFT_image[i])))/256);
+            real_freq[i] = 200 * i / 256;
+            Data.append(QPointF(real_freq[i],amp[i]));
+    }
+    series_fft->replace(Data);
+}
+
+MainWindow::~MainWindow()
+{
+    delete ui;
+}
+void MainWindow::zuobiao()
+{
+        QFont labelsFont;
+        labelsFont.setPixelSize(15);   //参数字号，数字越小，字就越小
+        axisX = new QValueAxis();//X轴
+        axisX->setRange(0,max_x);            //设置X轴范围
+        axisX->setTitleText("时间t");      //设置X轴标题
+        axisX->setLabelsFont(labelsFont);
+        axisY = new QValueAxis();//定义Y轴
+        axisY->setRange(-5,5);           //设置Y轴范围
+        axisY->setTitleText("电压V");      //设置Y轴标题
+        axisY->setTickCount(9);
+        axisY->setMinorTickCount(10);
+        axisX->setTickCount(11);
+        axisY->setLabelsFont(labelsFont);
+        chart->addAxis(axisX,Qt::AlignBottom);//把横轴添加到图表
+        chart->addAxis(axisY,Qt::AlignLeft);//把纵轴添加到图表
+
+        series_fft->attachAxis(axisX);
+        series_fft->attachAxis(axisY);
+        for (double i = 0; i < max_x; i+=1)
+        {
+            series->append(i, 10*sin(i*3.14*4/180));
+        }
+
+        // 设置折线的标题
+        series->setName("aduiduidui-loongson");
+        // 折线系列添加到图表,//openGl 加速
+        series->setUseOpenGL(true);
+        chart->addSeries(series);
+        ui->widget->setChart(chart);
+
+}
+
+void MainWindow::dialChanged(int value)
+{
+ui->lineEdit->setText(tr("Tri %1 V").arg(float(value) / 4 - 5));
+}
+void MainWindow::updateData_sigle(int m,int maxy)
+{
+    int i;
+    float data_fpga[200]={0};
+    float data_fpga1[500]={0};
+    QList<QPointF> data;
+    int max=200,das=500;
+    if(m<8)
+    {
+    getdata_fpga(data_fpga,&frequency,m,ui->dial->value());
+    for(i = 0; i < max; ++i)
+     {
+        if(data_fpga[i]>max_data)
+            max_data=data_fpga[i];
+        if(data_fpga[i]<min_data)
+            min_data=data_fpga[i];
+        data.append(QPointF(i ,data_fpga[i]*2*maxy));
+     }
+     series->replace(data);
+    }
+    else
+    {
+    getdata_fpga(data_fpga1,&frequency,m,ui->dial->value());
+    for(i = 0; i < das; ++i)
+     {
+        if(data_fpga[i]>max_data)
+            max_data=data_fpga[i];
+        if(data_fpga[i]<min_data)
+            min_data=data_fpga[i];
+        data.append(QPointF(i ,data_fpga1[i]*2*maxy));
+     }
+     series->replace(data);
+    }
+     showfreq();
+     max_data=0;
+     min_data=0;
+
+}
+
+void MainWindow::handleTimeout()
+{
+    if(isrun)
+    {
+        updateData_sigle(maxx,max_y);
+    }
+    if(frequency<100)
+    {
+        ui->radioButton->setText("20ms/div");
+        ui->radioButton_4->setText("40ms/div");
+        ui->radioButton_2->setText("160ms/div");
+    }
+    else if(frequency<100000)
+    {
+        ui->radioButton->setText("20us/div");
+        ui->radioButton_4->setText("40us/div");
+        ui->radioButton_2->setText("160us/div");
+    }
+    else
+    {
+        ui->radioButton->setText("100ns/div");
+        ui->radioButton_4->setText("200ns/div");
+        ui->radioButton_2->setText("2us/div");
+    }
+}
+
+void MainWindow::voltageClicked(int m)
+{
+    switch(m)
+    {
+        case 0:max_y=1;axisY->setRange(-5,5);break; //1v
+        case 1:max_y=2;axisY->setRange(-2.5,2.5);break;  //0.1v
+        case 2:max_y=500;axisY->setRange(-0.01,0.01);break;   //0.002v
+        case 3:max_y=10;axisY->setRange(-0.5,0.5);break;
+    }
+}
+void MainWindow::timeClicked(int m)
+{
+    if(frequency<100)
+    {
+        switch(m)
+        {
+            case 0:maxx=0;break; //2us   20
+            case 1:maxx=1;break; //20us  200
+            case 2:maxx=2;break;//20ms
+        }
+    }
+    else if(frequency<100000)
+    {
+        switch(m)
+        {
+            case 0:maxx=3;break; //2us   20
+            case 1:maxx=4;break; //20us  200
+            case 2:maxx=5;break;//20ms
+        }
+    }
+    else
+    {
+        switch(m)
+        {
+            case 0:maxx=6;break; //2us   20
+            case 1:maxx=7;break; //20us  200
+            case 2:maxx=8;break;//20ms
+        }
+    }
+}
+void MainWindow::runorstop()
+{
+    if(isrun)
+    {
+       isrun=0;
+    }
+    else
+       isrun=1;
+}
+void MainWindow::showfreq()
+{
+    if(frequency > 1000000)
+    {
+         ui->lineEdit_4->setText(tr("%1").arg((float)frequency/1000000)+"  MHZ");
+    }
+    else if (frequency > 1000)
+    {
+         ui->lineEdit_4->setText(tr("%1").arg((float)frequency/1000)+"  KHZ");
+    }
+    else
+    {
+         ui->lineEdit_4->setText(tr("%1").arg((float)frequency)+"  HZ");
+    }
+    ui->lineEdit_3->setText(tr("%1").arg(max_data-min_data)+"  V");
+    ui->lineEdit_2->setText(tr("%1").arg(max_data)+"  V");
+    ui->lineEdit_5->setText(tr("%1").arg(min_data)+"  V");
+
+}
+void MainWindow::FFT_WAVE()
+{   chart->zoomReset();
+    series_fft->setName("FFT_WAVE");
+    chart->addSeries(series_fft);
+    float FFT_real[256] = {0};
+    float FFT_image[256] = {0};
+    float amp[256] = {0};
+    float real_freq[256] = {0};
+    QList<QPointF> oldData = series->points();
+    QList<QPointF> Data;
+
+    // 使用零填充将数据扩展到256个点
+    for(int i = 0; i < 256; i++)
+    {
+        if(i < oldData.size())
+        {
+            FFT_real[i] = oldData.at(i).y();
+        }
+        else
+        {
+            FFT_real[i] = 0; // 零填充
+        }
+    }
+
+    FFT(FFT_real, FFT_image, 256);
+
+    for (int i = 0; i < 256; i++)
+    {
+        amp[i] = 2 * (sqrt((FFT_real[i] * FFT_real[i] + FFT_image[i] * FFT_image[i])) / 256);
+        real_freq[i] = 200 * i / 256;
+        Data.append(QPointF(real_freq[i], amp[i]));
+    }
+
+    series_fft->replace(Data);
+}
